@@ -1,0 +1,21 @@
+[
+	{
+		"Author": "Sevii",
+		"Name": "Animation Syncer",
+		"Description": "Sync Animations",
+		"InternalName": "AnimSync",
+		"AssemblyVersion": "1.0.0",
+		"TestingAssemblyVersion": "1.0.0",
+		"RepoUrl": "https://github.com/Sevii77/animation_syncer",
+		"ApplicableVersion": "any",
+		"DalamudApiLevel": 9,
+		"IsHide": "False",
+		"IsTestingExclusive": "False",
+		"DownloadCount": 0,
+		"LastUpdate": 0,
+		"DownloadLinkInstall": "https://github.com/Sevii77/animation_syncer/raw/master/release.zip",
+		"DownloadLinkTesting": "https://github.com/Sevii77/animation_syncer/raw/master/release.zip",
+		"DownloadLinkUpdate": "https://github.com/Sevii77/animation_syncer/raw/master/release.zip",
+		"Tags": ["Animation", "Sync"]
+	}
+]

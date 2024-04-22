@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using System.Collections.Generic;
 using Dalamud.IoC;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
@@ -9,8 +10,6 @@ using Dalamud.Game.Command;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
-using System.Collections.Generic;
-using FFXIVClientStructs.FFXIV.Client.Graphics;
 
 namespace AnimSync;
 
@@ -74,12 +73,15 @@ public class AnimSync: IDalamudPlugin {
 				
 				lock(RootSyncs) {
 					if(syncs.Count > 0) {
-						var position = obj.Position;
-						var rotations = new List<Quaternion>() {Quaternion.CreateFromAxisAngle(Vector3.UnitY, obj.Rotation)};
+						var transform = ((Actor*)obj.Address)->DrawObject->Skeleton->Transform;
+						var position = (Vector3)transform.Position;
+						var rotations = new List<Quaternion>() {transform.Rotation};
+						
 						var time = actor->Control->hkaAnimationControl.LocalTime;
 						foreach(var (syncObj, syncTime) in syncs) {
-							position += syncObj.Position;
-							rotations.Add(Quaternion.CreateFromAxisAngle(Vector3.UnitY, syncObj.Rotation));
+							transform = ((Actor*)obj.Address)->DrawObject->Skeleton->Transform;
+							position += (Vector3)transform.Position;
+							rotations.Add(transform.Rotation);
 							
 							if(syncTime)
 								time = Math.Max(time, ((Actor*)syncObj.Address)->Control->hkaAnimationControl.LocalTime);
@@ -136,10 +138,6 @@ public class AnimSync: IDalamudPlugin {
 				skeleton->Transform.Rotation = sync.Item2;
 			}
 		}
-		
-		// lock(actorBones)
-		// 	if(actorBones.TryGetValue((nint)((PartialSkeleton*)skelObj->Skeletons)->Pose, out var bones))
-		// 		skelObj->Transform = bones.root.GetValue(bones.time);
 	}
 	
 	private unsafe bool IsValidObject(GameObject obj) {

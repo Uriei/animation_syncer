@@ -10,30 +10,32 @@ using Dalamud.Game.Command;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
+using FFXIVClientStructs.Havok.Animation.Rig;
 
 namespace AnimSync;
 
 public class AnimSync: IDalamudPlugin {
 	public string Name => "Animation Syncer";
 	
-	[PluginService][RequiredVersion("1.0")] public static DalamudPluginInterface Interface  {get; private set;} = null!;
-	[PluginService][RequiredVersion("1.0")] public static ICommandManager        Commands   {get; private set;} = null!;
-	[PluginService][RequiredVersion("1.0")] public static IPluginLog             Logger     {get; private set;} = null!;
-	[PluginService][RequiredVersion("1.0")] public static IObjectTable           Objects    {get; private set;} = null!;
-	[PluginService][RequiredVersion("1.0")] public static IGameInteropProvider   HookProv   {get; private set;} = null!;
-	[PluginService][RequiredVersion("1.0")] public static ISigScanner            SigScanner {get; private set;} = null!;
+	[PluginService] public static IDalamudPluginInterface Interface  {get; private set;} = null!;
+	[PluginService] public static ICommandManager         Commands   {get; private set;} = null!;
+	[PluginService] public static IPluginLog              Logger     {get; private set;} = null!;
+	[PluginService] public static IObjectTable            Objects    {get; private set;} = null!;
+	[PluginService] public static IGameInteropProvider    HookProv   {get; private set;} = null!;
+	[PluginService] public static ISigScanner             SigScanner {get; private set;} = null!;
 	
 	private const string command = "/animsync";
 	private const float MAXDIST = 0.25f;
 	private const float MAXROT = (float)Math.PI / 4; // 45 degrees
 	
-	private unsafe delegate void AnimRootDelegate(Skeleton* skelObj, nint b);
+	private unsafe delegate void AnimRootDelegate(hkaPose* pose);
 	private static Hook<AnimRootDelegate> AnimRootHook = null!;
 	
-	private static Dictionary<nint, (Vector3, Quaternion)> RootSyncs = new();
+	private static Dictionary<nint, (Vector3, Quaternion, nint)> RootSyncs = new();
 	
 	public unsafe AnimSync() {
-		AnimRootHook = HookProv.HookFromAddress<AnimRootDelegate>(SigScanner.ScanText("48 83 EC 08 8B 02"), AnimRoot);
+		// AnimRootHook = HookProv.HookFromAddress<AnimRootDelegate>(SigScanner.ScanText("48 83 EC 08 8B 02"), AnimRoot);
+		AnimRootHook = HookProv.HookFromAddress<AnimRootDelegate>(SigScanner.ScanText("48 83 EC 18 80 79 ?? 00"), AnimRoot);
 		AnimRootHook.Enable();
 		
 		Interface.UiBuilder.Draw += Draw;
@@ -56,7 +58,7 @@ public class AnimSync: IDalamudPlugin {
 		foreach(var obj in Objects) {
 			if(IsValidObject(obj)) {
 				var actor = (Actor*)obj.Address;
-				var syncs = new List<(GameObject, bool)>();
+				var syncs = new List<(IGameObject, bool)>();
 				
 				foreach(var obj2 in Objects) {
 					if(IsValidObject(obj2)) {
@@ -73,13 +75,13 @@ public class AnimSync: IDalamudPlugin {
 				
 				lock(RootSyncs) {
 					if(syncs.Count > 0) {
-						var transform = ((Actor*)obj.Address)->DrawObject->Skeleton->Transform;
+						var transform = actor->DrawObject->Skeleton->Transform;
 						var position = (Vector3)transform.Position;
 						var rotations = new List<Quaternion>() {transform.Rotation};
 						
 						var time = actor->Control->hkaAnimationControl.LocalTime;
 						foreach(var (syncObj, syncTime) in syncs) {
-							transform = ((Actor*)obj.Address)->DrawObject->Skeleton->Transform;
+							transform = actor->DrawObject->Skeleton->Transform;
 							position += (Vector3)transform.Position;
 							rotations.Add(transform.Rotation);
 							
@@ -102,11 +104,11 @@ public class AnimSync: IDalamudPlugin {
 						}
 						
 						
-						RootSyncs[(nint)((Actor*)obj.Address)->DrawObject->Skeleton] = (position, rotation);
+						RootSyncs[(nint)actor->DrawObject->Skeleton->PartialSkeletons->GetHavokPose(0)] = (position, rotation, (nint)actor->DrawObject->Skeleton);
 						actor->Control->hkaAnimationControl.LocalTime = time;
 						
 						foreach(var (syncObj, syncTime) in syncs) {
-							RootSyncs[(nint)((Actor*)syncObj.Address)->DrawObject->Skeleton] = (position, rotation);
+							RootSyncs[(nint)((Actor*)syncObj.Address)->DrawObject->Skeleton->PartialSkeletons->GetHavokPose(0)] = (position, rotation, (nint)((Actor*)syncObj.Address)->DrawObject->Skeleton);
 							if(syncTime)
 								((Actor*)syncObj.Address)->Control->hkaAnimationControl.LocalTime = time;
 						}
@@ -129,18 +131,19 @@ public class AnimSync: IDalamudPlugin {
 		}
 	}
 	
-	private unsafe void AnimRoot(Skeleton* skeleton, nint b) {
-		AnimRootHook.Original(skeleton, b);
+	private unsafe void AnimRoot(hkaPose* pose) {
+		AnimRootHook.Original(pose);
 		
 		lock(RootSyncs) {
-			if(RootSyncs.TryGetValue((nint)skeleton, out var sync)) {
+			if(RootSyncs.TryGetValue((nint)pose, out var sync)) {
+				var skeleton = (Skeleton*)sync.Item3;
 				skeleton->Transform.Position = sync.Item1;
 				skeleton->Transform.Rotation = sync.Item2;
 			}
 		}
 	}
 	
-	private unsafe bool IsValidObject(GameObject obj) {
+	private unsafe bool IsValidObject(IGameObject obj) {
 		return (obj.ObjectKind == ObjectKind.BattleNpc || obj.ObjectKind == ObjectKind.Player) && ((Actor*)obj.Address)->Control != null;
 	}
 }

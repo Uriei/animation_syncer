@@ -2,8 +2,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<AssemblyName>AnimSync</AssemblyName>
-		<Authors>Sevii</Authors>
-		<Version>1.0.2</Version>
+		<Authors>Sevii + Uri</Authors>
+		<Version>1.0.4</Version>
 	</PropertyGroup>
 	
 	<PropertyGroup>

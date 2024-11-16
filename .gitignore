@@ -1,2 +1,7 @@
 bin/
 obj/
+.vs/ProjectSettings.json
+.vs/slnx.sqlite
+.vs/VSWorkspaceState.json
+.vs/animation_syncer/FileContentIndex/5515df52-c263-4b68-b265-e147bea9662c.vsidx
+.vs/animation_syncer/v17/.wsuo
